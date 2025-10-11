@@ -76,7 +76,7 @@ build :: () {
 					array_add(*cmd, sprint("-libpath:%\\um\\x64", root));
 					array_add(*cmd, sprint("-out:%\\%", options.output_path, phase.executable_name));
 					if DEBUG array_add(*cmd, "-debug");
-					array_add(*cmd, "-nologo", "-incremental:no", "-nodefaultlib", "-subsystem:windows", "-noexp", "-noimplib");
+					array_add(*cmd, "-nologo", "-incremental:no", "-nodefaultlib", "-subsystem:windows", "-noexp", "-noimplib", "-stack:0x10000000,0x10000000");
 					array_add(*cmd, ifx options.backend == .LLVM sprint("-entry:WinMainCRTStartup_%", entry_suffix) else "-entry:WinMainCRTStartup"); // @Cleanup This whole idea is ugly.
 					array_add(*cmd, ..phase.compiler_generated_object_files);
 					array_add(*cmd, ..phase.support_object_files);

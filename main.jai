@@ -1,10 +1,3 @@
-/* TODO
-Draw all ui_rects.
-	Create white texture.
-	Create max-sized buffer.
-	Emit draw call.
-*/
-
 usize :: u64;
 ssize :: s64;
 
@@ -28,6 +21,11 @@ v4 :: struct {
 
 max :: inline (a: $T, b: T) -> T #no_context { return ifx a > b a else b; }
 min :: inline (a: $T, b: T) -> T #no_context { return ifx a < b a else b; }
+offset_of :: ($T: Type, $member: string) -> int #compile_time {
+	for type_info(T).members if it.name == member return it.offset_in_bytes;
+	compile_time_debug_break();
+	return -1;
+}
 
 Game_Input :: struct {
 	dt: float;
@@ -75,10 +73,18 @@ game_update_and_render :: (memory: []u8, input: *Game_Input, output: *Game_Outpu
 
 	rect(output, .{
 		position=.{0.5, 0.0, 0.0},
-		size=.{0.5, 0.5},
+		size=.{0.25, 0.25},
 		texcoords=.[.{}, .{1.0, 1.0}],
 		texture=.WHITE,
 		color=.{1.0, 0.0, 1.0, 1.0},
+	});
+
+	rect(output, .{
+		position=.{-0.5, 0.0, 0.0},
+		size=.{0.25, 0.25},
+		texcoords=.[.{}, .{1.0, 1.0}],
+		texture=.WHITE,
+		color=.{0.0, 0.0, 1.0, 1.0},
 	});
 
 	state.keys_previous = input.keys.*;
@@ -88,10 +94,33 @@ game_update_and_render :: (memory: []u8, input: *Game_Input, output: *Game_Outpu
 	// 1.0
 	GL_DEPTH_BUFFER_BIT :: 0x00000100;
 	GL_COLOR_BUFFER_BIT :: 0x00004000;
+	GL_TRIANGLES :: 0x0004;
+	GL_TEXTURE_2D :: 0x0DE1;
+	GL_UNSIGNED_BYTE :: 0x1401;
+	GL_UNSIGNED_SHORT :: 0x1403;
+	GL_UNSIGNED_INT :: 0x1405;
+	GL_FLOAT :: 0x1406;
 	GL_COLOR :: 0x1800;
 	GL_DEPTH :: 0x1801;
+	GL_RED :: 0x1903;
+	GL_RGB :: 0x1907;
+	GL_RGBA :: 0x1908;
+	GL_POINT :: 0x1B00;
+	GL_LINE :: 0x1B01;
+	GL_FILL :: 0x1B02;
 	GL_NEAREST :: 0x2600;
 	GL_LINEAR :: 0x2601;
+
+	// 1.1
+	GL_RGBA8 :: 0x8058;
+
+	// 1.5
+	GL_STATIC_DRAW :: 0x88E4;
+	GL_STREAM_DRAW :: 0x88E0;
+
+	// 2.0
+	GL_FRAGMENT_SHADER :: 0x8B30;
+	GL_VERTEX_SHADER :: 0x8B31;
 
 	// 3.0
 	GL_RGBA16F :: 0x881A;
@@ -115,6 +144,10 @@ game_update_and_render :: (memory: []u8, input: *Game_Input, output: *Game_Outpu
 	opengl_main_fbo:        u32;
 	opengl_main_fbo_color0: u32;
 	opengl_main_fbo_depth:  u32;
+	opengl_white_texture:   u32;
+	opengl_rect_vao:        u32;
+	opengl_rect_ibo:        u32;
+	opengl_rect_shader:     u32;
 	using opengl_procs:     struct {
 		glViewport: (x: s32, y: s32, w: u32, h: u32) #c_call; @v1_0
 		glClear: (mask: u32) #c_call; @v1_0
@@ -122,15 +155,55 @@ game_update_and_render :: (memory: []u8, input: *Game_Input, output: *Game_Outpu
 		glEnable: (capability: u32) #c_call; @v1_0
 		glDisable: (capability: u32) #c_call; @v1_0
 
-		glBindFramebuffer: (target: u32, fbo: u32) #c_call; @v3_0
+		glDrawArrays: (mode: u32, first: s32, count: u32) #c_call; @v1_1
+		glDrawElements: (mode: u32, count: u32, type: u32, indices: *void) #c_call; @v1_1
 
+		glCreateProgram: () -> u32 #c_call; @v2_0
+		glAttachShader: (program: u32, shader: u32) #c_call; @v2_0
+		glDetachShader: (program: u32, shader: u32) #c_call; @v2_0
+		glLinkProgram: (program: u32) #c_call; @v2_0
+		glUseProgram: (program: u32) #c_call; @v2_0
+		glCreateShader: (type: u32) -> u32 #c_call; @v2_0
+		glDeleteShader: (shader: u32) #c_call; @v2_0
+		glShaderSource: (shader: u32, count: u32, strings: **u8, length: *s32) #c_call; @v2_0
+		glCompileShader: (shader: u32) #c_call; @v2_0
+
+		glBindFramebuffer: (target: u32, fbo: u32) #c_call; @v3_0
+		glBindVertexArray: (vao: u32) #c_call; @v3_0
+
+		glDrawElementsInstanced: (mode: u32, count: u32, type: u32, indices: *void, instances: ssize) #c_call; @v3_1
+
+		glCreateVertexArrays: (n: u32, ids: *u32) #c_call; @v4_5
+		glVertexArrayElementBuffer: (vao: u32, ebo: u32) #c_call; @v4_5
+		glVertexArrayVertexBuffer: (vao: u32, binding: u32, buffer: u32, offset: ssize, stride: u32) #c_call; @v4_5
+		glVertexArrayBindingDivisor: (vao: u32, binding: u32, divisor: u32) #c_call; @v4_5
+		glEnableVertexArrayAttrib: (vao: u32, attrib: u32) #c_call; @v4_5
+		glVertexArrayAttribBinding: (vao: u32, attrib: u32, binding: u32) #c_call; @v4_5
+		glVertexArrayAttribFormat: (vao: u32, attrib: u32, size: s32, type: u32, normalized: bool, offset: u32) #c_call; @v4_5
+		glCreateBuffers: (n: u32, ids: *u32) #c_call; @v4_5
+		glNamedBufferData: (buffer: u32, size: ssize, data: *void, flags: u32) #c_call; @v4_5
+		glNamedBufferSubData: (buffer: u32, offset: ssize, size: ssize, data: *void) #c_call; @v4_5
 		glCreateFramebuffers: (n: u32, ids: *u32) #c_call; @v4_5
 		glClearNamedFramebufferfv: (fbo: u32, buffer: u32, drawbuffer: s32, value: *float) #c_call; @v4_5
 		glNamedFramebufferRenderbuffer: (fbo: u32, attachment: u32, target: u32, rbo: u32) #c_call; @v4_5
 		glBlitNamedFramebuffer: (read_fbo: u32, write_fbo: u32, sx0: s32, sy0: s32, sx1: s32, sy1: s32, dx0: s32, dy0: s32, dx1: s32, dy1: s32, mask: u32, filter: u32) #c_call; @v4_5
 		glCreateRenderbuffers: (n: u32, ids: *u32) #c_call; @v4_5
 		glNamedRenderbufferStorageMultisample: (rbo: u32, samples: u32, internalformat: u32, w: u32, h: u32) #c_call; @v4_5
+		glCreateTextures: (target: u32, n: u32, ids: *u32) #c_call; @v4_5
+		glTextureStorage2D: (texture: u32, levels: u32, internalformat: u32, w: u32, h: u32) #c_call; @v4_5
+		glTextureSubImage2D: (texture: u32, level: s32, x: s32, y: s32, w: u32, h: u32, format: u32, type: u32, pixels: *void) #c_call; @v4_5
+		glBindTextureUnit: (unit: u32, texture: u32) #c_call; @v4_5
 	};
+
+	OpenGL_Rect_Vertex :: struct {
+		position: v2;
+	}
+
+	OpenGL_Rect_Instance :: struct {
+		offset: v3;
+		scale:  v2;
+		color:  v4;
+	}
 
 	opengl_init :: () #no_context {
 		#if OS == .WINDOWS {
@@ -196,6 +269,106 @@ game_update_and_render :: (memory: []u8, input: *Game_Input, output: *Game_Outpu
 		glCreateFramebuffers(1, *opengl_main_fbo);
 		glCreateRenderbuffers(1, *opengl_main_fbo_color0);
 		glCreateRenderbuffers(1, *opengl_main_fbo_depth);
+
+		white_pixel: u32 = 0xFFFFFFFF;
+		glCreateTextures(GL_TEXTURE_2D, 1, *opengl_white_texture);
+		glTextureStorage2D(opengl_white_texture, 1, GL_RGBA8, 1, 1);
+		glTextureSubImage2D(opengl_white_texture, 0, 0, 0, 1, 1,
+			GL_RGBA, GL_UNSIGNED_BYTE, *white_pixel);
+
+		{
+			RECT_VERTICES :: OpenGL_Rect_Vertex.[
+				.{.{-1.0, -1.0}},
+				.{.{+1.0, -1.0}},
+				.{.{+1.0, +1.0}},
+				.{.{-1.0, +1.0}},
+			];
+			RECT_ELEMENTS :: u16.[0, 1, 2, 2, 3, 0];
+
+			rect_vbo: u32 = ---;
+			glCreateBuffers(1, *rect_vbo);
+			glNamedBufferData(rect_vbo, RECT_VERTICES.count * size_of(type_of(RECT_VERTICES[0])), RECT_VERTICES.data, GL_STATIC_DRAW);
+
+			rect_ebo: u32 = ---;
+			glCreateBuffers(1, *rect_ebo);
+			glNamedBufferData(rect_ebo, RECT_ELEMENTS.count * size_of(type_of(RECT_ELEMENTS[0])), RECT_ELEMENTS.data, GL_STATIC_DRAW);
+
+			glCreateBuffers(1, *opengl_rect_ibo);
+			glNamedBufferData(opengl_rect_ibo, Game_Output.ui_rects.count * size_of(OpenGL_Rect_Instance), null, GL_STREAM_DRAW);
+
+			vbo_binding :: 0;
+			ibo_binding :: 1;
+			glCreateVertexArrays(1, *opengl_rect_vao);
+			glVertexArrayElementBuffer(opengl_rect_vao, rect_ebo);
+			glVertexArrayVertexBuffer(opengl_rect_vao, vbo_binding, rect_vbo, 0, size_of(OpenGL_Rect_Vertex));
+			glVertexArrayVertexBuffer(opengl_rect_vao, ibo_binding, opengl_rect_ibo, 0, size_of(OpenGL_Rect_Instance));
+			glVertexArrayBindingDivisor(opengl_rect_vao, ibo_binding, 1);
+
+			position_attrib :: 0;
+			glEnableVertexArrayAttrib(opengl_rect_vao, position_attrib);
+			glVertexArrayAttribBinding(opengl_rect_vao, position_attrib, vbo_binding);
+			glVertexArrayAttribFormat(opengl_rect_vao, position_attrib, 2, GL_FLOAT, false, #run offset_of(OpenGL_Rect_Vertex, "position"));
+
+			offset_attrib :: 1;
+			glEnableVertexArrayAttrib(opengl_rect_vao, offset_attrib);
+			glVertexArrayAttribBinding(opengl_rect_vao, offset_attrib, ibo_binding);
+			glVertexArrayAttribFormat(opengl_rect_vao, offset_attrib, 3, GL_FLOAT, false, #run offset_of(OpenGL_Rect_Instance, "offset"));
+
+			scale_attrib :: 2;
+			glEnableVertexArrayAttrib(opengl_rect_vao, scale_attrib);
+			glVertexArrayAttribBinding(opengl_rect_vao, scale_attrib, ibo_binding);
+			glVertexArrayAttribFormat(opengl_rect_vao, scale_attrib, 2, GL_FLOAT, false, #run offset_of(OpenGL_Rect_Instance, "scale"));
+
+			color_attrib :: 3;
+			glEnableVertexArrayAttrib(opengl_rect_vao, color_attrib);
+			glVertexArrayAttribBinding(opengl_rect_vao, color_attrib, ibo_binding);
+			glVertexArrayAttribFormat(opengl_rect_vao, color_attrib, 4, GL_FLOAT, false, #run offset_of(OpenGL_Rect_Instance, "color"));
+		}
+
+		{
+			vsrc :: #string LANG_GLSL
+#version 450
+
+layout(location=0) in vec2 a_position;
+layout(location=1) in vec3 i_offset;
+layout(location=2) in vec2 i_scale;
+layout(location=3) in vec4 i_color;
+
+layout(location=3) out vec4 f_color;
+
+void main() {
+	gl_Position = vec4(vec3(a_position * i_scale, 0.0) + i_offset, 1.0);
+	f_color = i_color;
+}
+LANG_GLSL;
+			vshader := glCreateShader(GL_VERTEX_SHADER);
+			defer glDeleteShader(vshader);
+			glShaderSource(vshader, 1, (*u8).[vsrc.data].data, s32.[xx vsrc.count].data);
+			glCompileShader(vshader);
+
+			fsrc :: #string LANG_GLSL
+#version 450
+
+layout(location=3) in vec4 f_color;
+
+layout(location=0) out vec4 color;
+
+void main() {
+	color = f_color;
+}
+LANG_GLSL;
+			fshader := glCreateShader(GL_FRAGMENT_SHADER);
+			defer glDeleteShader(fshader);
+			glShaderSource(fshader, 1, (*u8).[fsrc.data].data, s32.[xx fsrc.count].data);
+			glCompileShader(fshader);
+
+			opengl_rect_shader = glCreateProgram();
+			glAttachShader(opengl_rect_shader, vshader);
+			glAttachShader(opengl_rect_shader, fshader);
+			glLinkProgram(opengl_rect_shader);
+			glDetachShader(opengl_rect_shader, vshader);
+			glDetachShader(opengl_rect_shader, fshader);
+		}
 	}
 
 	opengl_deinit :: () #no_context {
@@ -225,12 +398,29 @@ game_update_and_render :: (memory: []u8, input: *Game_Input, output: *Game_Outpu
 		glViewport(0, 0, platform_width, platform_height);
 	}
 
-	opengl_present :: (ui_rects: []Game_Renderer.Rect) #no_context {
+	opengl_present :: (output: *Game_Output) #no_context {
 		glClearNamedFramebufferfv(opengl_main_fbo, GL_COLOR, 0, float.[0.6, 0.2, 0.2, 1.0].data);
 		glClearNamedFramebufferfv(opengl_main_fbo, GL_DEPTH, 0, float.[0.0].data);
 		glBindFramebuffer(GL_FRAMEBUFFER, opengl_main_fbo);
 
-		// @Hack fixes default framebuffer bug on intel.
+		rects_count := output.ui_rects_count;
+		rects: [Game_Output.ui_rects.count]OpenGL_Rect_Instance = ---;
+		for 0..rects_count-1 {
+			ui_rect := *output.ui_rects[it];
+			rects[it] = .{
+				offset=ui_rect.position,
+				scale=ui_rect.size,
+				color=ui_rect.color,
+			};
+		}
+		glNamedBufferSubData(opengl_rect_ibo, 0, rects_count * size_of(type_of(rects[0])), rects.data);
+
+		glBindTextureUnit(0, opengl_white_texture);
+		glBindVertexArray(opengl_rect_vao);
+		glUseProgram(opengl_rect_shader);
+		glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, null, rects_count);
+
+		// @Hack fixes default framebuffer bug on Intel.
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glClear(0);
 
@@ -268,10 +458,10 @@ renderer_resize :: inline () #no_context {
 	}
 }
 
-renderer_present :: inline (ui_rects: []Game_Renderer.Rect) #no_context {
+renderer_present :: inline (output: *Game_Output) #no_context {
 	#if #complete RENDERER == {
 	case .NONE;
-	case .OPENGL; opengl_present(ui_rects);
+	case .OPENGL; opengl_present(output);
 	}
 }
 
@@ -320,6 +510,7 @@ renderer_present :: inline (ui_rects: []Game_Renderer.Rect) #no_context {
 	WM_SYSKEYDOWN :: 0x0104;
 	WM_SYSKEYUP :: 0x0105;
 	WM_SYSCOMMAND :: 0x0112;
+	WM_SIZING :: 0x0214;
 	SC_KEYMENU :: 0xF100;
 	GWL_STYLE :: -16;
 	MONITOR_DEFAULTTOPRIMARY :: 0x1;
@@ -486,14 +677,17 @@ renderer_present :: inline (ui_rects: []Game_Renderer.Rect) #no_context {
 }
 
 #if OS == .WINDOWS {
-	platform_frequency:       s64;
-	platform_hinstance:       HINSTANCE;
-	platform_hwnd:            HWND;
-	platform_hdc:             HDC;
-	platform_width:           u16;
-	platform_height:          u16;
-	platform_keys:            [128] bool;
-	platform_key_transitions: [128] u8;
+	platform_sleep_is_granular: bool;
+	platform_frequency:         s64;
+	platform_previous_ticks:    s64;
+	platform_hinstance:         HINSTANCE;
+	platform_hwnd:              HWND;
+	platform_hdc:               HDC;
+	platform_width:             u16;
+	platform_height:            u16;
+	platform_memory:            []u8;
+	platform_keys:              [128] bool;
+	platform_key_transitions:   [128] u8;
 
 	utf8_to_utf16lez :: ($s: string) -> [s.count + 1]u16 #no_context #compile_time {
 		result: [s.count + 1]u16 = ---;
@@ -535,20 +729,44 @@ renderer_present :: inline (ui_rects: []Game_Renderer.Rect) #no_context {
 		memset(platform_keys.data, 0, platform_keys.count * size_of(type_of(platform_keys[0])));
 	}
 
+	// @Hack this is very ugly to have a separate procedure for
+	//       updating our platform but Windows won't update our
+	//       window during WM_SIZING unless we call it there too.
+	platform_game_tick :: () #no_context {
+		current_ticks: s64 = ---;
+		QueryPerformanceCounter(*current_ticks);
+		delta_ticks := current_ticks - platform_previous_ticks;
+		delta_seconds := cast(float) delta_ticks / platform_frequency;
+		platform_previous_ticks = current_ticks;
+
+		input: Game_Input;
+		input.dt = delta_seconds;
+		input.keys = *platform_keys;
+		input.key_transitions = *platform_key_transitions;
+
+		output: Game_Output;
+		game_update_and_render(platform_memory, *input, *output);
+
+		renderer_present(*output);
+
+		if platform_sleep_is_granular {
+			Sleep(1);
+		}
+	}
+
 	WinMainCRTStartup :: () #c_call {
 		platform_hinstance = GetModuleHandleW(null);
 
-		sleep_is_granular := timeBeginPeriod(1) == TIMERR_NOERROR;
+		platform_sleep_is_granular = timeBeginPeriod(1) == TIMERR_NOERROR;
 
 		QueryPerformanceFrequency(*platform_frequency);
 		start_ticks: s64 = ---;
 		QueryPerformanceCounter(*start_ticks);
-		previous_ticks := start_ticks;
+		platform_previous_ticks = start_ticks;
 
-		memory: []u8 = ---;
-		memory.count = 1 * 1024 * 1024 * 1024; // 1 gigglebyte is enough for anybody.
-		memory.data = VirtualAlloc(null, xx memory.count, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-		if !memory.data ExitProcess(1);
+		platform_memory.count = 1 * 1024 * 1024 * 1024; // 1 gigglebyte is enough for anybody.
+		platform_memory.data = VirtualAlloc(null, xx platform_memory.count, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+		if !platform_memory.data ExitProcess(1);
 
 		SetProcessDPIAware();
 		wndclass: WNDCLASSEXW;
@@ -569,6 +787,8 @@ renderer_present :: inline (ui_rects: []Game_Renderer.Rect) #no_context {
 				platform_height = ((lParam >> 16) & 0xFFFF).(u16);
 
 				renderer_resize();
+			case WM_SIZING;
+				platform_game_tick();
 			case WM_CREATE;
 				platform_hwnd = hwnd;
 				platform_hdc  = GetDC(hwnd);
@@ -631,28 +851,7 @@ renderer_present :: inline (ui_rects: []Game_Renderer.Rect) #no_context {
 				}
 			}
 
-			current_ticks: s64 = ---;
-			QueryPerformanceCounter(*current_ticks);
-			delta_ticks := current_ticks - previous_ticks;
-			delta_seconds := cast(float) delta_ticks / platform_frequency;
-			previous_ticks = current_ticks;
-
-			input: Game_Input;
-			input.dt = delta_seconds;
-			input.keys = *platform_keys;
-			input.key_transitions = *platform_key_transitions;
-
-			output: Game_Output;
-			game_update_and_render(memory, *input, *output);
-
-			ui_rects: []Game_Renderer.Rect = ---;
-			ui_rects.data = output.ui_rects.data;
-			ui_rects.count = output.ui_rects.count;
-			renderer_present(ui_rects);
-
-			if sleep_is_granular {
-				Sleep(1);
-			}
+			platform_game_tick();
 		}
 
 		ExitProcess(0);
@@ -660,6 +859,10 @@ renderer_present :: inline (ui_rects: []Game_Renderer.Rect) #no_context {
 
 	// linker garbage.
 	#program_export _fltused: s32;
+
+	// @Cleanup remove this when LLVM gets -mno-stack-arg-probe
+	#if BACKEND == .LLVM
+		#program_export __chkstk :: () #c_call {}
 
 	// @Cleanup remove this when X64 backend is fixed.
 	#if BACKEND == .X64
