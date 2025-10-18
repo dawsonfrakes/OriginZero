@@ -1,7 +1,7 @@
 @echo off
 
 dmd -of=.build\OriginZero.exe^
- -betterC -debug -version=Steam^
+ -betterC -g -debug -version=Steam^
  main.d^
  -L=Kernel32.lib -L=-subsystem:windows -L=-incremental:no || goto :error
 
