@@ -50,6 +50,13 @@ enum WM_SYSKEYDOWN = 0x0104;
 enum WM_SYSKEYUP = 0x0105;
 enum WM_SYSCOMMAND = 0x0112;
 enum SC_KEYMENU = 0xF100;
+enum HWND_TOP = cast(HWND) 0;
+enum SWP_NOSIZE = 0x0001;
+enum SWP_NOMOVE = 0x0002;
+enum SWP_NOZORDER = 0x0004;
+enum SWP_FRAMECHANGED = 0x0020;
+enum MONITOR_DEFAULTTOPRIMARY = 0x1;
+enum GWL_STYLE = -16;
 enum VK_RETURN = 0x0D;
 enum VK_MENU = 0x12;
 enum VK_ESCAPE = 0x1B;
@@ -98,6 +105,21 @@ struct MSG {
   POINT     pt;
   uint      lPrivate;
 }
+struct WINDOWPLACEMENT {
+  uint  length;
+  uint  flags;
+  uint  showCmd;
+  POINT ptMinPosition;
+  POINT ptMaxPosition;
+  RECT  rcNormalPosition;
+  RECT  rcDevice;
+}
+struct MONITORINFO {
+  uint cbSize;
+  RECT rcMonitor;
+  RECT rcWork;
+  uint dwFlags;
+}
 
 @foreign("User32") extern(Windows) {
 	int SetProcessDPIAware();
@@ -111,8 +133,67 @@ struct MSG {
 	ptrdiff_t DefWindowProcW(HWND, uint, size_t, ptrdiff_t);
 	void PostQuitMessage(int);
 	HDC GetDC(HWND);
+	int ClipCursor(const(RECT)*);
 	int ValidateRect(HWND, const(RECT)*);
 	int DestroyWindow(HWND);
+	int GetWindowPlacement(HWND, WINDOWPLACEMENT*);
+	int SetWindowPlacement(HWND, const(WINDOWPLACEMENT)*);
+	int SetWindowPos(HWND, HWND, int, int, int, int, uint);
+	ptrdiff_t GetWindowLongPtrW(HWND, int);
+	ptrdiff_t SetWindowLongPtrW(HWND, int, ptrdiff_t);
+	HMONITOR MonitorFromWindow(HWND, uint);
+	int GetMonitorInfoW(HMONITOR, MONITORINFO*);
+}
+
+// Gdi32
+enum PFD_DOUBLEBUFFER = 0x00000001;
+enum PFD_DRAW_TO_WINDOW = 0x00000004;
+enum PFD_SUPPORT_OPENGL = 0x00000020;
+enum PFD_DEPTH_DONTCARE = 0x20000000;
+
+struct PIXELFORMATDESCRIPTOR {
+  ushort nSize;
+  ushort nVersion;
+  uint   dwFlags;
+  ubyte  iPixelType;
+  ubyte  cColorBits;
+  ubyte  cRedBits;
+  ubyte  cRedShift;
+  ubyte  cGreenBits;
+  ubyte  cGreenShift;
+  ubyte  cBlueBits;
+  ubyte  cBlueShift;
+  ubyte  cAlphaBits;
+  ubyte  cAlphaShift;
+  ubyte  cAccumBits;
+  ubyte  cAccumRedBits;
+  ubyte  cAccumGreenBits;
+  ubyte  cAccumBlueBits;
+  ubyte  cAccumAlphaBits;
+  ubyte  cDepthBits;
+  ubyte  cStencilBits;
+  ubyte  cAuxBuffers;
+  ubyte  iLayerType;
+  ubyte  bReserved;
+  uint   dwLayerMask;
+  uint   dwVisibleMask;
+  uint   dwDamageMask;
+}
+
+@foreign("Gdi32") extern(Windows) {
+	int ChoosePixelFormat(HDC, const(PIXELFORMATDESCRIPTOR)*);
+	int SetPixelFormat(HDC, int, const(PIXELFORMATDESCRIPTOR)*);
+	int SwapBuffers(HDC);
+}
+
+// Opengl32
+struct HGLRC__; alias HGLRC = HGLRC__*;
+
+@foreign("Opengl32") extern(Windows) {
+	HGLRC wglCreateContext(HDC);
+	int wglDeleteContext(HGLRC);
+	int wglMakeCurrent(HDC, HGLRC);
+	PROC wglGetProcAddress(const(char)*);
 }
 
 // Ws2_32

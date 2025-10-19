@@ -1,58 +1,56 @@
 import basic;
+import platform.globals;
 static import game;
 
-/+
-	Alias basic.windows definitions as normal if they're not a function,
-	or if they're a function from Kernel32. Otherwise, make them a function pointer.
-+/
-static import basic.windows;
-static foreach (it; __traits(allMembers, basic.windows)[1..$]) {
-	static if (has_uda!(__traits(getMember, basic.windows, it), foreign) && !string_equal(get_uda!(__traits(getMember, basic.windows, it), foreign).library, "Kernel32")) {
-		mixin("__gshared typeof(basic.windows."~it~")* "~it~";");
+void switch_renderer(Render_Api_Flags new_api) {
+	renderer_deinit();
+	platform_render_api = new_api;
+	renderer_init();
+	renderer_resize();
+}
+
+void toggle_fullscreen() {
+	__gshared WINDOWPLACEMENT save_placement = {WINDOWPLACEMENT.sizeof};
+	ptrdiff_t style = GetWindowLongPtrW(platform_hwnd, GWL_STYLE);
+	if (style & WS_OVERLAPPEDWINDOW) {
+		MONITORINFO mi = {MONITORINFO.sizeof};
+		GetMonitorInfoW(MonitorFromWindow(platform_hwnd, MONITOR_DEFAULTTOPRIMARY), &mi);
+
+		GetWindowPlacement(platform_hwnd, &save_placement);
+		SetWindowLongPtrW(platform_hwnd, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
+		SetWindowPos(platform_hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+			mi.rcMonitor.right - mi.rcMonitor.left,
+			mi.rcMonitor.bottom - mi.rcMonitor.top,
+			SWP_FRAMECHANGED);
 	} else {
-		mixin("alias "~it~" = basic.windows."~it~";");
+		SetWindowLongPtrW(platform_hwnd, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
+		SetWindowPlacement(platform_hwnd, &save_placement);
+		SetWindowPos(platform_hwnd, null, 0, 0, 0, 0, SWP_NOMOVE |
+			SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 	}
 }
 
-version (Steam) {
-	static import basic.steam;
-	static foreach (it; __traits(allMembers, basic.steam)[1..$]) {
-		static if (has_uda!(__traits(getMember, basic.steam, it), foreign)) {
-			mixin("__gshared typeof(basic.steam."~it~")* "~it~";");
-		} else {
-			mixin("alias "~it~" = basic.steam."~it~";");
+void update_cursor_clip() {
+	ClipCursor(null);
+}
+
+void clear_held_keys() {
+	foreach (it; 0..platform_keys.length) {
+		if (platform_keys.ptr[it]) {
+			platform_key_transitions.ptr[it] += 1;
+			platform_keys.ptr[it] = false;
 		}
 	}
 }
 
-__gshared {
-	HINSTANCE platform_hinstance;
-	HWND platform_hwnd;
-	HDC platform_hdc;
-	ushort platform_width;
-	ushort platform_height;
-	bool[128] platform_keys;
-	byte[128] platform_key_transitions;
-}
-
-void toggle_fullscreen() {
-
-}
-
-void update_cursor_clip() {
-
-}
-
-void clear_held_keys() {
-
-}
-
 extern(Windows) noreturn WinMainCRTStartup() {
-	// Load basic.windows function pointers for non-Kernel32.
 	HMODULE User32_dll = LoadLibraryW("USER32.DLL");
+	HMODULE Gdi32_dll = LoadLibraryW("GDI32.DLL");
+	HMODULE Opengl32_dll = LoadLibraryW("OPENGL32.DLL");
 	HMODULE Ws2_32_dll = LoadLibraryW("WS2_32.DLL");
 	HMODULE Dwmapi_dll = LoadLibraryW("DWMAPI.DLL");
 	HMODULE Winmm_dll = LoadLibraryW("WINMM.DLL");
+	static import basic.windows;
 	static foreach (it; __traits(allMembers, basic.windows)[1..$]) {
 		static if (has_uda!(__traits(getMember, basic.windows, it), foreign) && !string_equal(get_uda!(__traits(getMember, basic.windows, it), foreign).library, "Kernel32")) {
 			mixin(it~" = cast(typeof("~it~")) GetProcAddress("~get_uda!(__traits(getMember, basic.windows, it), foreign).library~"_dll, \""~it~"\");");
@@ -80,6 +78,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
 	}
 
 	version (Steam) {
+		static import basic.steam;
 		HMODULE SteamAPI_dll = LoadLibraryW("./"~SteamAPI~".DLL");
 		static foreach (it; __traits(allMembers, basic.steam)[1..$]) {
 			static if (has_uda!(__traits(getMember, basic.steam, it), foreign)) {
@@ -108,6 +107,8 @@ extern(Windows) noreturn WinMainCRTStartup() {
 			case WM_SIZE:
 				platform_width = cast(ushort) lParam;
 				platform_height = cast(ushort) (lParam >> 16);
+
+				renderer_resize();
 				return 0;
 			case WM_CREATE:
 				platform_hwnd = hwnd;
@@ -119,8 +120,12 @@ extern(Windows) noreturn WinMainCRTStartup() {
 					int round_mode = DWMWCP_DONOTROUND;
 					DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &round_mode, round_mode.sizeof);
 				}
+
+				renderer_init();
 				return 0;
 			case WM_DESTROY:
+				renderer_deinit();
+
 				PostQuitMessage(0);
 				return 0;
 			case WM_SYSCOMMAND:
@@ -156,7 +161,6 @@ extern(Windows) noreturn WinMainCRTStartup() {
 
 					if (!repeat && (!sys || alt || wParam == VK_MENU || wParam == VK_F10)) {
 						if (pressed) {
-							debug if (wParam == VK_ESCAPE) DestroyWindow(platform_hwnd);
 							if (wParam == VK_F4 && alt) DestroyWindow(platform_hwnd);
 							if (wParam == VK_F11) toggle_fullscreen();
 							if (wParam == VK_RETURN && alt) toggle_fullscreen();
@@ -167,6 +171,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
 							platform_key_transitions.ptr[wParam] += 1;
 						}
 					}
+					DispatchMessageW(&msg); // @Hack for steam overlay.
 					break;
 				case WM_QUIT:
 					break main_loop;
@@ -182,9 +187,15 @@ extern(Windows) noreturn WinMainCRTStartup() {
 
 		game.Input input;
 		input.delta_time = delta_time;
+		input.keys = platform_keys;
+		input.key_transitions = platform_key_transitions;
 
 		game.Output output;
 		game.update_and_render(memory, &input, &output);
+
+		if (output.quit_requested) DestroyWindow(platform_hwnd);
+
+		renderer_present(&output);
 
 		if (sleep_is_granular) {
 			Sleep(1);
