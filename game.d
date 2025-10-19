@@ -1,5 +1,7 @@
 struct Input {
 	float delta_time;
+	bool[] keys;
+	byte[] key_transitions;
 }
 
 struct Output {

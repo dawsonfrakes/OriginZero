@@ -14,12 +14,25 @@ static foreach (it; __traits(allMembers, basic.windows)[1..$]) {
 	}
 }
 
+version (Steam) {
+	static import basic.steam;
+	static foreach (it; __traits(allMembers, basic.steam)[1..$]) {
+		static if (has_uda!(__traits(getMember, basic.steam, it), foreign)) {
+			mixin("__gshared typeof(basic.steam."~it~")* "~it~";");
+		} else {
+			mixin("alias "~it~" = basic.steam."~it~";");
+		}
+	}
+}
+
 __gshared {
 	HINSTANCE platform_hinstance;
 	HWND platform_hwnd;
 	HDC platform_hdc;
 	ushort platform_width;
 	ushort platform_height;
+	bool[128] platform_keys;
+	byte[128] platform_key_transitions;
 }
 
 void toggle_fullscreen() {
@@ -64,6 +77,20 @@ extern(Windows) noreturn WinMainCRTStartup() {
 	ubyte[] memory = (cast(ubyte*) memory_data)[0..memory_count];
 	if (!memory.ptr) {
 		ExitProcess(1);
+	}
+
+	version (Steam) {
+		HMODULE SteamAPI_dll = LoadLibraryW("./"~SteamAPI~".DLL");
+		static foreach (it; __traits(allMembers, basic.steam)[1..$]) {
+			static if (has_uda!(__traits(getMember, basic.steam, it), foreign)) {
+				mixin(it~" = cast(typeof("~it~")) GetProcAddress(SteamAPI_dll, \""~it~"\");");
+			}
+		}
+		bool steam_supported = SteamAPI_InitFlat != null;
+		if (steam_supported) {
+			ESteamAPIInitResult initted = SteamAPI_InitFlat(null);
+			steam_supported = initted == ESteamAPIInitResult.OK;
+		}
 	}
 
 	SetProcessDPIAware();
@@ -138,6 +165,11 @@ extern(Windows) noreturn WinMainCRTStartup() {
 							if (wParam == VK_F11) toggle_fullscreen();
 							if (wParam == VK_RETURN && alt) toggle_fullscreen();
 						}
+
+						if (wParam < 128) {
+							platform_keys.ptr[wParam] = pressed;
+							platform_key_transitions.ptr[wParam] += 1;
+						}
 					}
 					break;
 				case WM_QUIT:
@@ -163,8 +195,9 @@ extern(Windows) noreturn WinMainCRTStartup() {
 		}
 	}
 
+	version (Steam) if (steam_supported) SteamAPI_Shutdown();
 	if (networking_supported) WSACleanup();
 	ExitProcess(0);
 }
 
-extern(C) int _fltused;
+extern(C) __gshared int _fltused;
