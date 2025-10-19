@@ -1,9 +1,12 @@
 import std.array : split;
+import std.file : mkdirRecurse;
 import std.process : spawnProcess, wait;
 import std.stdio : writeln;
 
 void main(string[] args) {
-	auto exit_code = "dmd -o- -of=.build/OriginZero.exe -betterC -g -debug -version=Steam -i platform/main_windows.d -L=Kernel32.lib -L=-subsystem:windows -L=-incremental:no".split.spawnProcess.wait;
+	".build".mkdirRecurse;
+
+	auto exit_code = "dmd -g -debug -of=.build/OriginZero.exe -betterC -version=Steam -i platform/main_windows.d -L=Kernel32.lib -L=-subsystem:windows -L=-incremental:no".split.spawnProcess.wait;
 	if (exit_code) return;
 
 	if (args.length <= 1) return;
@@ -15,7 +18,7 @@ void main(string[] args) {
 			"raddbg .build/OriginZero.exe".split.spawnProcess.wait;
 			break;
 		case "release":
-			"dmd -O -release -o- -of=build_release/OriginZero.exe -betterC -version=Steam -i platform/main_windows.d -L=Kernel32.lib -L=-subsystem:windows -L=-incremental:no".split.spawnProcess.wait;
+			"dmd -O -release -of=build_release/OriginZero.exe -betterC -version=Steam -i platform/main_windows.d -L=Kernel32.lib -L=-subsystem:windows -L=-incremental:no".split.spawnProcess.wait;
 			break;
 		default:
 			writeln("Unknown command '", args[1], "'");
