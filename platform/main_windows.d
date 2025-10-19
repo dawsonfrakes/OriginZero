@@ -86,11 +86,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
 				mixin(it~" = cast(typeof("~it~")) GetProcAddress(SteamAPI_dll, \""~it~"\");");
 			}
 		}
-		bool steam_supported = SteamAPI_InitFlat != null;
-		if (steam_supported) {
-			ESteamAPIInitResult initted = SteamAPI_InitFlat(null);
-			steam_supported = initted == ESteamAPIInitResult.OK;
-		}
+		bool steam_supported = SteamAPI_InitFlat && SteamAPI_InitFlat(null) == ESteamAPIInitResult.OK;
 	}
 
 	SetProcessDPIAware();
@@ -200,4 +196,4 @@ extern(Windows) noreturn WinMainCRTStartup() {
 	ExitProcess(0);
 }
 
-extern(C) __gshared int _fltused;
+__gshared extern(C) int _fltused;
