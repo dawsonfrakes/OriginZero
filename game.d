@@ -44,7 +44,8 @@ struct UI_Rect {
 }
 
 struct Input {
-	float delta_time;
+	v2 resolution;
+	float delta_time=0;
 	bool[] keys;
 	byte[] key_transitions;
 }
@@ -57,25 +58,39 @@ struct Output {
 
 struct State {
 	bool initted;
+	float cached_aspect_ratio=0;
 }
 
 void ui_rect(Output* output, v3 position, v2 size, v4 color = v4(1.0)) {
-	if (output.ui_rects.length < output.ui_rects.capacity) {
-		UI_Rect* rect = &output.ui_rects.buffer.ptr[output.ui_rects.length];
-		rect.position = position;
-		rect.size = size;
-		rect.color = color;
-		output.ui_rects.length += 1;
-	}
+	UI_Rect rect = void;
+	rect.position = position;
+	rect.size = size;
+	rect.color = color;
+	output.ui_rects.append(rect);
 }
 
 void update_and_render(ubyte[] memory, Input* input, Output* output) {
 	State* state = cast(State*) memory.ptr;
 	if (!state.initted) {
 		state.initted = true;
+
+		state.cached_aspect_ratio = 16.0 / 9.0;
 	}
 
-	ui_rect(output, v3(0.0), v2(0.5));
+	if (input.resolution.y != 0) {
+		state.cached_aspect_ratio = input.resolution.x / input.resolution.y;
+	}
+
+	enum num_rects_x = 64;
+	enum num_rects_y = 64;
+
+	foreach (y; 0..num_rects_y) {
+	foreach (x; 0..num_rects_x) {
+		ui_rect(output, v3(-1.0 + (x + 0.5) * (2.0 / num_rects_x), -1.0 + (y + 0.5) * (2.0 / num_rects_y), 0.0), v2(1.0 / (num_rects_x / 2), 1.0 / (num_rects_y / 2)));
+	}
+	}
+
+	// ui_rect(output, v3(+0.5, +0.5, 0.0), v2(0.5));
 
 	debug if (input.keys.ptr[Key.ESCAPE]) output.quit_requested = true;
 }

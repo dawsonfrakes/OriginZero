@@ -20,7 +20,7 @@ T get_uda(alias x, T)() {
 
 struct Bounded_Array(size_t N, T) {
 	size_t length;
-	T[N] buffer;
+	T[N] buffer = void;
 	alias capacity = N;
 
 	int opApply(int delegate(ref T) dg) {
@@ -29,6 +29,11 @@ struct Bounded_Array(size_t N, T) {
 			if (result) return result;
 		}
 		return 0;
+	}
+
+	void append(T elem) {
+		if (length < capacity)
+			buffer.ptr[length++] = elem;
 	}
 }
 

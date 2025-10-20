@@ -186,6 +186,8 @@ extern(Windows) noreturn WinMainCRTStartup() {
 		clock_previous = clock_current;
 
 		game.Input input;
+		input.resolution.x = platform_width;
+		input.resolution.y = platform_height;
 		input.delta_time = delta_time;
 		input.keys = platform_keys;
 		input.key_transitions = platform_key_transitions;

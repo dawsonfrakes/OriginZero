@@ -96,6 +96,11 @@ enum GL_FRAMEBUFFER_SRGB = 0x8DB9;
 	void glBindVertexArray(uint);
 }
 
+// 3.1
+@gl_version(3, 1) extern(System) {
+	void glDrawElementsInstanced(uint, uint, uint, const(void)*, uint);
+}
+
 // 3.2
 enum GL_MAX_COLOR_TEXTURE_SAMPLES = 0x910E;
 enum GL_MAX_DEPTH_TEXTURE_SAMPLES = 0x910F;
@@ -117,5 +122,6 @@ enum GL_MAX_DEPTH_TEXTURE_SAMPLES = 0x910F;
 	void glVertexArrayAttribBinding(uint, uint, uint);
 	void glCreateBuffers(uint, uint*);
 	void glNamedBufferData(uint, size_t, const(void)*, uint);
+	void glNamedBufferSubData(uint, ptrdiff_t, size_t, const(void)*);
 	void glCreateTextures(uint, uint, uint*);
 }
