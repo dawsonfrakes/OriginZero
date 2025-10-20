@@ -4,6 +4,20 @@ struct foreign {
 	string library;
 }
 
+auto min(Ts...)(Ts args) if (args.length >= 2) {
+	auto result = args[0];
+	static foreach (it; args[1..$])
+		result = result < it ? result : it;
+	return result;
+}
+
+auto max(Ts...)(Ts args) if (args.length >= 2) {
+	auto result = args[0];
+	static foreach (it; args[1..$])
+		result = result > it ? result : it;
+	return result;
+}
+
 bool has_uda(alias x, T)() {
 	static foreach (it; __traits(getAttributes, x))
 		static if (is(typeof(it) == T)) return true;
