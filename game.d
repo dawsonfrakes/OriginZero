@@ -27,6 +27,8 @@ alias v4 = Vector!(4, float);
 enum Key : ubyte {
 	SPACE = ' ',
 	ESCAPE = 0x1B,
+	ARROW_UP = 0x26,
+	ARROW_DOWN = 0x28,
 	_0 = '0', _1, _2, _3, _4, _5, _6, _7, _8, _9,
 	A = 'A',
 	B, C, D, E, F, G, H,
@@ -48,6 +50,7 @@ struct Input {
 	float delta_time=0;
 	bool[] keys;
 	byte[] key_transitions;
+	// v3 mouse_delta;
 }
 
 struct Output {
@@ -58,6 +61,7 @@ struct Output {
 
 struct State {
 	bool initted;
+
 	float cached_aspect_ratio=0;
 }
 
@@ -81,16 +85,7 @@ void update_and_render(ubyte[] memory, Input* input, Output* output) {
 		state.cached_aspect_ratio = input.resolution.x / input.resolution.y;
 	}
 
-	enum num_rects_x = 64;
-	enum num_rects_y = 64;
-
-	foreach (y; 0..num_rects_y) {
-	foreach (x; 0..num_rects_x) {
-		ui_rect(output, v3(-1.0 + (x + 0.5) * (2.0 / num_rects_x), -1.0 + (y + 0.5) * (2.0 / num_rects_y), 0.0), v2(1.0 / (num_rects_x / 2), 1.0 / (num_rects_y / 2)));
-	}
-	}
-
-	// ui_rect(output, v3(+0.5, +0.5, 0.0), v2(0.5));
+	ui_rect(output, v3(+0.5, +0.5, 0.0), v2(0.5));
 
 	debug if (input.keys.ptr[Key.ESCAPE]) output.quit_requested = true;
 }

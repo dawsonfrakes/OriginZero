@@ -182,7 +182,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
 
 		long clock_current = void;
 		QueryPerformanceCounter(&clock_current);
-		float delta_time = cast(float) (clock_previous - clock_current) / clock_frequency;
+		float delta_time = cast(float) (clock_current - clock_previous) / clock_frequency;
 		clock_previous = clock_current;
 
 		game.Input input;

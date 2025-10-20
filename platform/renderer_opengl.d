@@ -86,6 +86,7 @@ struct OpenGL_Rect_Vertex {
 struct OpenGL_Rect_Instance {
 	game.v3 offset;
 	game.v2 scale;
+	game.v4 color;
 }
 
 void opengl_init() {
@@ -103,12 +104,15 @@ void opengl_init() {
 		layout(location = 1) in vec2 a_texcoord;
 		layout(location = 2) in vec3 i_offset;
 		layout(location = 3) in vec2 i_scale;
+		layout(location = 4) in vec4 i_color;
 
 		layout(location = 1) out vec2 f_texcoord;
+		layout(location = 4) out vec4 f_color;
 
 		void main() {
 			gl_Position = vec4(vec3(a_position * i_scale, 0.0) + i_offset, 1.0);
 			f_texcoord = a_texcoord;
+			f_color = i_color;
 		}
 		";
 		uint vshader = glCreateShader(GL_VERTEX_SHADER);
@@ -120,11 +124,12 @@ void opengl_init() {
 		"#version 450
 
 		layout(location = 1) in vec2 f_texcoord;
+		layout(location = 4) in vec4 f_color;
 
 		layout(location = 0) out vec4 color;
 
 		void main() {
-			color = vec4(f_texcoord, 1.0, 1.0);
+			color = f_color;
 		}
 		";
 		uint fshader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -190,6 +195,11 @@ void opengl_init() {
 		glEnableVertexArrayAttrib(opengl.rect_vao, scale_attrib);
 		glVertexArrayAttribBinding(opengl.rect_vao, scale_attrib, ibo_binding);
 		glVertexArrayAttribFormat(opengl.rect_vao, scale_attrib, 2, GL_FLOAT, false, OpenGL_Rect_Instance.scale.offsetof);
+
+		enum color_attrib = 4;
+		glEnableVertexArrayAttrib(opengl.rect_vao, color_attrib);
+		glVertexArrayAttribBinding(opengl.rect_vao, color_attrib, ibo_binding);
+		glVertexArrayAttribFormat(opengl.rect_vao, color_attrib, 4, GL_FLOAT, false, OpenGL_Rect_Instance.color.offsetof);
 	}
 }
 
@@ -230,6 +240,7 @@ void opengl_present(game.Output* output) {
 		OpenGL_Rect_Instance instance;
 		instance.offset = rect.position;
 		instance.scale  = rect.size;
+		instance.color  = rect.color;
 		rect_instances.append(instance);
 	}
 	glNamedBufferSubData(opengl.rect_ibo, 0, rect_instances.length * OpenGL_Rect_Instance.sizeof, rect_instances.buffer.ptr);
