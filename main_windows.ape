@@ -1,0 +1,6 @@
+(:: WINAPI (if (== CPU .X86) 'STDCALL 'C))
+
+(foreign ExitProcess (proto (status : u32) noreturn #callconv WINAPI) #library "Kernel32")
+
+(proc WinMainCRTStartup () noreturn #callconv WINAPI
+	(ExitProcess 0))
