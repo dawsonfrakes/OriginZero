@@ -71,9 +71,21 @@ struct OpenGLData {
 	uint main_fbo;
 	uint main_fbo_color0;
 	uint main_fbo_depth;
+
+	uint rect_shader;
+	uint rect_vao;
+	uint rect_ibo;
 }
 
 __gshared OpenGLData opengl;
+
+struct OpenGL_Rect_Vertex {
+	game.v2 position;
+	game.v2 texcoord;
+}
+struct OpenGL_Rect_Instance {
+	game.v3 offset;
+}
 
 void opengl_init() {
 	opengl_platform_init();
@@ -81,6 +93,80 @@ void opengl_init() {
 	glCreateFramebuffers(1, &opengl.main_fbo);
 	glCreateRenderbuffers(1, &opengl.main_fbo_color0);
 	glCreateRenderbuffers(1, &opengl.main_fbo_depth);
+
+	{
+		string vsrc =
+		"#version 450
+
+		layout(location = 0) in vec3 a_position;
+
+		void main() {
+			gl_Position = vec4(a_position, 1.0);
+		}
+		";
+		uint vshader = glCreateShader(GL_VERTEX_SHADER);
+		const(char)*[1] vsrcs = [vsrc.ptr];
+		glShaderSource(vshader, vsrcs.length, vsrcs.ptr, null);
+		glCompileShader(vshader);
+
+		string fsrc =
+		"#version 450
+
+		layout(location = 0) out vec4 color;
+
+		void main() {
+			color = vec4(1.0, 0.0, 1.0, 1.0);
+		}
+		";
+		uint fshader = glCreateShader(GL_FRAGMENT_SHADER);
+		const(char)*[1] fsrcs = [fsrc.ptr];
+		glShaderSource(fshader, fsrcs.length, fsrcs.ptr, null);
+		glCompileShader(fshader);
+
+		opengl.rect_shader = glCreateProgram();
+		glAttachShader(opengl.rect_shader, vshader);
+		glAttachShader(opengl.rect_shader, fshader);
+		glLinkProgram(opengl.rect_shader);
+		glDetachShader(opengl.rect_shader, fshader);
+		glDetachShader(opengl.rect_shader, vshader);
+
+		glDeleteShader(fshader);
+		glDeleteShader(vshader);
+	}
+
+	{
+		__gshared immutable OpenGL_Rect_Vertex[4] rect_vertices = [
+			OpenGL_Rect_Vertex(game.v2(-0.5)),
+			OpenGL_Rect_Vertex(game.v2(+0.5, -0.5)),
+			OpenGL_Rect_Vertex(game.v2(+0.5)),
+			OpenGL_Rect_Vertex(game.v2(-0.5, +0.5)),
+		];
+		__gshared immutable ushort[6] rect_indices = [0, 1, 2, 2, 3, 0];
+
+		uint rect_ebo = void;
+		glCreateBuffers(1, &rect_ebo);
+		glNamedBufferData(rect_ebo, rect_indices.length * ushort.sizeof, rect_indices.ptr, GL_STATIC_DRAW);
+
+		uint rect_vbo = void;
+		glCreateBuffers(1, &rect_vbo);
+		glNamedBufferData(rect_vbo, rect_vertices.length * OpenGL_Rect_Vertex.sizeof, rect_vertices.ptr, GL_STATIC_DRAW);
+
+		glCreateBuffers(1, &opengl.rect_ibo);
+		glNamedBufferData(opengl.rect_ibo, game.Output.ui_rects.capacity * OpenGL_Rect_Instance.sizeof, null, GL_STATIC_DRAW);
+
+		enum vbo_binding = 0;
+		enum ibo_binding = 1;
+		glCreateVertexArrays(1, &opengl.rect_vao);
+		glVertexArrayElementBuffer(opengl.rect_vao, rect_ebo);
+		glVertexArrayVertexBuffer(opengl.rect_vao, vbo_binding, rect_vbo, 0, OpenGL_Rect_Vertex.sizeof);
+		glVertexArrayVertexBuffer(opengl.rect_vao, ibo_binding, opengl.rect_ibo, 0, OpenGL_Rect_Instance.sizeof);
+		glVertexArrayBindingDivisor(opengl.rect_vao, ibo_binding, 1);
+
+		enum position_attrib = 0;
+		glEnableVertexArrayAttrib(opengl.rect_vao, position_attrib);
+		glVertexArrayAttribBinding(opengl.rect_vao, position_attrib, vbo_binding);
+		glVertexArrayAttribFormat(opengl.rect_vao, position_attrib, 3, GL_FLOAT, false, OpenGL_Rect_Vertex.position.offsetof);
+	}
 }
 
 void opengl_deinit() {
@@ -114,6 +200,14 @@ void opengl_present(game.Output* output) {
 
 	glViewport(0, 0, platform_width, platform_height);
 	glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
+
+	foreach (rect; output.ui_rects) {
+
+	}
+
+	glBindVertexArray(opengl.rect_vao);
+	glUseProgram(opengl.rect_shader);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, null);
 
 	// @Hack for intel default framebuffer resize bug.
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);

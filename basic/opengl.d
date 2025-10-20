@@ -1,5 +1,8 @@
 module basic.opengl;
 
+import basic : uda;
+
+@uda
 struct gl_version {
 	ubyte major;
 	ubyte minor;
@@ -51,10 +54,29 @@ enum GL_REPEAT = 0x2901;
 	void glViewport(int, int, uint, uint);
 }
 
+// 1.1
+@gl_version(1, 1) extern(System) {
+	void glDrawElements(uint, uint, uint, const(void)*);
+}
+
+// 1.5
+enum GL_STREAM_DRAW = 0x88E0;
+enum GL_STATIC_DRAW = 0x88E4;
+
 // 2.0
+enum GL_FRAGMENT_SHADER = 0x8B30;
+enum GL_VERTEX_SHADER = 0x8B31;
+
 @gl_version(2, 0) extern(System) {
 	uint glCreateProgram();
+	void glShaderSource(uint, uint, const(char*)*, const(int)*);
+	void glAttachShader(uint, uint);
+	void glDetachShader(uint, uint);
+	void glLinkProgram(uint);
+	void glUseProgram(uint);
 	uint glCreateShader(uint);
+	void glDeleteShader(uint);
+	void glCompileShader(uint);
 }
 
 // 3.0
@@ -87,6 +109,13 @@ enum GL_MAX_DEPTH_TEXTURE_SAMPLES = 0x910F;
 	void glCreateRenderbuffers(uint, uint*);
 	void glNamedRenderbufferStorageMultisample(uint, uint, uint, uint, uint);
 	void glCreateVertexArrays(uint, uint*);
+	void glVertexArrayVertexBuffer(uint, uint, uint, ptrdiff_t, uint);
+	void glVertexArrayElementBuffer(uint, uint);
+	void glVertexArrayBindingDivisor(uint, uint, uint);
+	void glEnableVertexArrayAttrib(uint, uint);
+	void glVertexArrayAttribFormat(uint, uint, int, uint, bool, uint);
+	void glVertexArrayAttribBinding(uint, uint, uint);
 	void glCreateBuffers(uint, uint*);
+	void glNamedBufferData(uint, size_t, const(void)*, uint);
 	void glCreateTextures(uint, uint, uint*);
 }
