@@ -1,7 +1,7 @@
-memset64 = terralib.intrinsic("llvm.memset.p0.i64", {intptr, int8, int64, bool} -> {})
+memset64 = terralib.intrinsic("llvm.memset.p0.i64", {&opaque, int8, int64, bool} -> {})
 
 memset = macro(function(addr, c, count)
-	return `memset64([intptr](addr), c, count, false)
+	return `memset64(addr, c, count, false)
 end)
 
 require "main_windows"
