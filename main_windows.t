@@ -49,7 +49,7 @@ platform_height          = global(uint16)
 platform_keys            = global(bool[128])
 platform_key_transitions = global(uint8[128])
 
-save_placement = global(`WINDOWPLACEMENT {sizeof(WINDOWPLACEMENT)})
+local save_placement = global(`WINDOWPLACEMENT {sizeof(WINDOWPLACEMENT)})
 local terra toggle_fullscreen()
 	var style = GetWindowLongPtrW(platform_hwnd, GWL_STYLE)
 	if (style and WS_OVERLAPPEDWINDOW) ~= 0 then
@@ -152,6 +152,13 @@ terra WinMainCRTStartup()
 	var wsadata: WSADATA
 	var networking_supported = WSAStartup ~= nil and WSAStartup(0x202, &wsadata) == 0
 
+	var memory: Slice(uint8)
+	memory.count = 1 * 1024 * 1024 * 1024
+	memory.data = [&uint8](VirtualAlloc(nil, memory.count, MEM_RESERVE or MEM_COMMIT, PAGE_READWRITE))
+	if memory.data == nil then
+		ExitProcess(1)
+	end
+
 	SetProcessDPIAware()
 	var wndclass: WNDCLASSEXW
 	memset(&wndclass, 0, sizeof(WNDCLASSEXW))
@@ -188,6 +195,11 @@ terra WinMainCRTStartup()
 		QueryPerformanceCounter(&clock_current)
 		var delta_time = [float](clock_current - clock_previous) / clock_frequency
 		clock_previous = clock_current
+
+		var input = Game_Input {}
+		input.delta_time = delta_time
+		var output = Game_Output {}
+		game_update_and_render(memory, &input, &output)
 
 		if sleep_is_granular then
 			Sleep(1)

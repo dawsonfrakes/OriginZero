@@ -1,4 +1,8 @@
 -- Kernel32
+MEM_COMMIT = 0x00001000
+MEM_RESERVE = 0x00002000
+PAGE_READWRITE = 0x04
+
 HRESULT = int32
 HINSTANCE = &terralib.types.newstruct("HINSTANCE__")
 HMODULE = HINSTANCE
@@ -11,6 +15,7 @@ Kernel32 = {
 	{"QueryPerformanceFrequency", &int64 -> int32},
 	{"QueryPerformanceCounter", &int64 -> int32},
 	{"Sleep", uint32 -> {}},
+	{"VirtualAlloc", {&opaque, intptr, uint32, uint32} -> &opaque},
 	{"ExitProcess", uint32 -> {}},
 }
 
@@ -62,52 +67,52 @@ HCURSOR = &terralib.types.newstruct("HCURSOR__")
 HMONITOR = &terralib.types.newstruct("HMONITOR__")
 WNDPROC = {HWND, uint32, intptr, ptrdiff} -> ptrdiff
 struct POINT {
-	x: int32;
-	y: int32;
+	x: int32
+	y: int32
 }
 struct RECT {
-	left: int32;
-	top: int32;
-	right: int32;
-	bottom: int32;
+	left: int32
+	top: int32
+	right: int32
+	bottom: int32
 }
 struct WNDCLASSEXW {
-	cbSize: uint32;
-	style: uint32;
-	lpfnWndProc: WNDPROC;
-	cbClsExtra: int32;
-	cbWndExtra: int32;
-	hInstance: HINSTANCE;
-	hIcon: HICON;
-	hCursor: HCURSOR;
-	hbrBackground: HBRUSH;
-	lpszMenuName: &int16;
-	lpszClassName: &int16;
-	hIconSm: HICON;
+	cbSize: uint32
+	style: uint32
+	lpfnWndProc: WNDPROC
+	cbClsExtra: int32
+	cbWndExtra: int32
+	hInstance: HINSTANCE
+	hIcon: HICON
+	hCursor: HCURSOR
+	hbrBackground: HBRUSH
+	lpszMenuName: &int16
+	lpszClassName: &int16
+	hIconSm: HICON
 }
 struct MSG {
-	hwnd: HWND;
-	message: uint32;
-	wParam: intptr;
-	lParam: ptrdiff;
-	time: uint32;
-	pt: POINT;
-	lPrivate: uint32;
+	hwnd: HWND
+	message: uint32
+	wParam: intptr
+	lParam: ptrdiff
+	time: uint32
+	pt: POINT
+	lPrivate: uint32
 }
 struct WINDOWPLACEMENT {
-	length: uint32;
-	flags: uint32;
-	showCmd: uint32;
-	ptMinPosition: POINT;
-	ptMaxPosition: POINT;
-	rcNormalPosition: RECT;
-	rcDevice: RECT;
+	length: uint32
+	flags: uint32
+	showCmd: uint32
+	ptMinPosition: POINT
+	ptMaxPosition: POINT
+	rcNormalPosition: RECT
+	rcDevice: RECT
 }
 struct MONITORINFO {
-	cbSize: uint32;
-	rcMonitor: RECT;
-	rcWork: RECT;
-	dwFlags: uint32;
+	cbSize: uint32
+	rcMonitor: RECT
+	rcWork: RECT
+	dwFlags: uint32
 }
 
 HWND_TOP = constant(HWND, 0) -- @Hack this should be above the declaration, but can't be.
@@ -141,22 +146,22 @@ WSADESCRIPTION_LEN = 256
 WSASYS_STATUS_LEN = 128
 
 struct WSADATA32 {
-	wVersion: uint16;
-	wHighVersion: uint16;
-	szDescription: int8[WSADESCRIPTION_LEN + 1];
-	szSystemStatus: int8[WSASYS_STATUS_LEN + 1];
-	iMaxSockets: uint16;
-	iMaxUdpDg: uint16;
-	lpVendorInfo: &int8;
+	wVersion: uint16
+	wHighVersion: uint16
+	szDescription: int8[WSADESCRIPTION_LEN + 1]
+	szSystemStatus: int8[WSASYS_STATUS_LEN + 1]
+	iMaxSockets: uint16
+	iMaxUdpDg: uint16
+	lpVendorInfo: &int8
 }
 struct WSADATA64 {
-	wVersion: uint16;
-	wHighVersion: uint16;
-	iMaxSockets: uint16;
-	iMaxUdpDg: uint16;
-	lpVendorInfo: &int8;
-	szDescription: int8[WSADESCRIPTION_LEN + 1];
-	szSystemStatus: int8[WSASYS_STATUS_LEN + 1];
+	wVersion: uint16
+	wHighVersion: uint16
+	iMaxSockets: uint16
+	iMaxUdpDg: uint16
+	lpVendorInfo: &int8
+	szDescription: int8[WSADESCRIPTION_LEN + 1]
+	szSystemStatus: int8[WSASYS_STATUS_LEN + 1]
 }
 WSADATA = CPU_BITS == 32 and WSADATA32 or WSADATA64
 
