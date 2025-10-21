@@ -45,6 +45,9 @@ terra WinMainCRTStartup()
 	[load_windows_procedures_from_libraries()]
 
 	SetProcessDPIAware()
+	var wndclass: WNDCLASSEXW
+	memset(&wndclass, 0, sizeof(WNDCLASSEXW))
+	wndclass.cbSize = sizeof(WNDCLASSEXW)
 
 	ExitProcess(0)
 end
